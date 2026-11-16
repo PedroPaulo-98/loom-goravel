@@ -1,0 +1,111 @@
+{{define "document"}}<!doctype html>
+<html lang="pt-BR" class="h-full">
+<head>{{template "head" .}}</head>
+<body class="h-full bg-gray-50 font-sans text-gray-950 antialiased dark:bg-gray-950 dark:text-white" hx-boost="true" hx-headers='{"X-CSRF-Token": "{{.CSRF}}"}'>
+<div class="flex min-h-full">
+  <aside class="lm-sidebar sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-gray-200 bg-white transition-[width] duration-200 dark:border-white/10 dark:bg-gray-900 lg:flex">
+    <div class="flex h-16 items-center gap-2 border-b border-gray-200 px-4 dark:border-white/10">
+      <a href="{{.HomeURL}}" class="flex min-w-0 items-center gap-2">
+        <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary-500 text-sm font-bold text-white">{{initial .Brand}}</span>
+        <span class="lm-label truncate text-base font-semibold tracking-tight">{{.Brand}}</span>
+      </a>
+    </div>
+    <nav class="flex-1 space-y-4 overflow-y-auto p-3">
+      {{range .Nav}}
+      <div>
+        {{if .Label}}<div class="lm-group-label mb-1 px-3 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500"><span class="lm-label">{{.Label}}</span></div>{{end}}
+        <div class="space-y-0.5">
+          {{range .Items}}
+          <a href="{{.URL}}" title="{{.Label}}" class="lm-nav-link flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium
+             {{if .Active}}bg-primary-50 text-primary-700 dark:bg-primary-500/10 dark:text-primary-400{{else}}text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-white/5{{end}}">
+            {{icon .Icon "h-5 w-5 shrink-0"}}<span class="lm-label truncate">{{.Label}}</span>
+          </a>
+          {{end}}
+        </div>
+      </div>
+      {{end}}
+    </nav>
+    {{if .Collapsible}}
+    <div class="border-t border-gray-200 p-3 dark:border-white/10">
+      <button type="button" onclick="loom.toggleSidebar()" title="Recolher / expandir menu" aria-label="Recolher menu"
+              class="lm-nav-link flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-white/5">
+        {{icon "chevron-double-left" "h-5 w-5 shrink-0"}}<span class="lm-label">Recolher menu</span>
+      </button>
+    </div>
+    {{end}}
+  </aside>
+
+  <div class="flex min-w-0 flex-1 flex-col">
+    <header class="sticky top-0 z-10 flex h-16 items-center justify-between gap-4 border-b border-gray-200 bg-white/90 px-4 backdrop-blur dark:border-white/10 dark:bg-gray-900/90 sm:px-8">
+      <nav class="flex gap-1 overflow-x-auto lg:hidden">
+        {{range .Nav}}{{range .Items}}<a href="{{.URL}}" class="whitespace-nowrap rounded-md px-2 py-1 text-sm {{if .Active}}bg-primary-50 text-primary-700 dark:bg-primary-500/10 dark:text-primary-400{{else}}text-gray-600 dark:text-gray-300{{end}}">{{.Label}}</a>{{end}}{{end}}
+      </nav>
+      <div class="relative ml-auto">
+        <button type="button" id="lm-user-button" aria-haspopup="true" aria-expanded="false" aria-controls="lm-user-menu"
+                class="flex items-center gap-3 rounded-full py-1 pl-1 pr-1 text-left hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:hover:bg-white/5 sm:rounded-xl sm:pl-3">
+          <span class="hidden sm:block">
+            <span class="block text-sm font-medium">{{.UserName}}</span>
+            <span class="block text-xs text-gray-500 dark:text-gray-400">{{.UserEmail}}</span>
+          </span>
+          <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary-600 text-sm font-semibold text-white">{{initial .UserName}}</span>
+          <span class="hidden text-gray-400 sm:block">{{icon "chevron-down" "h-4 w-4"}}</span>
+          <span class="sr-only">Abrir menu do usuário</span>
+        </button>
+
+        <div id="lm-user-menu" hidden role="menu" aria-label="Menu do usuário"
+             class="absolute right-0 z-20 mt-2 w-72 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg dark:border-white/10 dark:bg-gray-900">
+          <div class="flex items-center gap-3 border-b border-gray-200 px-4 py-3 dark:border-white/10">
+            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary-600 text-sm font-semibold text-white">{{initial .UserName}}</span>
+            <div class="min-w-0">
+              <div class="truncate text-sm font-medium">{{.UserName}}</div>
+              <div class="truncate text-xs text-gray-500 dark:text-gray-400">{{.UserEmail}}</div>
+            </div>
+          </div>
+
+          <div class="space-y-2 border-b border-gray-200 px-4 py-3 dark:border-white/10">
+            <div class="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500" id="lm-theme-label">Tema</div>
+            <div class="grid grid-cols-3 gap-1 rounded-lg bg-gray-100 p-1 dark:bg-white/5" role="group" aria-labelledby="lm-theme-label">
+              {{range $o := themeOptions}}
+              <button type="button" data-theme-option="{{$o.Mode}}" onclick="loom.setTheme('{{$o.Mode}}')" aria-pressed="false"
+                      class="flex flex-col items-center gap-1 rounded-md px-2 py-1.5 text-xs text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white
+                             aria-pressed:bg-white aria-pressed:text-primary-600 aria-pressed:shadow-sm dark:aria-pressed:bg-white/10 dark:aria-pressed:text-primary-400">
+                {{icon $o.Icon "h-5 w-5"}}<span>{{$o.Label}}</span>
+              </button>
+              {{end}}
+            </div>
+          </div>
+
+          <div class="space-y-2 border-b border-gray-200 px-4 py-3 dark:border-white/10">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500" id="lm-font-label">Tamanho da fonte</span>
+              <span class="text-xs tabular-nums text-gray-500 dark:text-gray-400" data-font-label aria-live="polite">100%</span>
+            </div>
+            <div class="grid grid-cols-3 gap-1" role="group" aria-labelledby="lm-font-label">
+              <button type="button" data-font-step="-1" onclick="loom.fontSize(-1)" aria-label="Diminuir fonte"
+                      class="rounded-lg border border-gray-200 py-1.5 text-sm font-semibold hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/10 dark:hover:bg-white/5">A−</button>
+              <button type="button" data-font-step="0" onclick="loom.fontSize(0)" aria-label="Tamanho padrão"
+                      class="rounded-lg border border-gray-200 py-1.5 text-xs hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/10 dark:hover:bg-white/5">Padrão</button>
+              <button type="button" data-font-step="1" onclick="loom.fontSize(1)" aria-label="Aumentar fonte"
+                      class="rounded-lg border border-gray-200 py-1.5 text-base font-semibold hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/10 dark:hover:bg-white/5">A+</button>
+            </div>
+          </div>
+
+          <form method="post" action="{{.LogoutURL}}" class="p-1">
+            <input type="hidden" name="_token" value="{{.CSRF}}">
+            <button type="submit" role="menuitem"
+                    class="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-danger-600 hover:bg-danger-50 dark:text-danger-400 dark:hover:bg-danger-500/10">
+              {{icon "arrow-right-start-on-rectangle" "h-5 w-5"}} Sair
+            </button>
+          </form>
+        </div>
+      </div>
+    </header>
+
+    <main class="mx-auto w-full {{.MaxWidth}} flex-1 px-4 py-8 sm:px-8">
+      {{template "flash" .}}
+      {{template "content" .}}
+    </main>
+  </div>
+</div>
+</body>
+</html>{{end}}

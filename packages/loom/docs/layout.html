@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="pt-BR" class="h-full scroll-smooth">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{.Page.Title}} · Loom docs</title>
+<meta name="description" content="{{if .Page.Lead}}{{.Page.Lead}}{{else}}Documentação do Loom, o construtor de painéis admin para Goravel.{{end}}">
+<script>
+  (function () {
+    var m; try { m = localStorage.getItem('loom-docs-theme'); } catch (e) {}
+    var dark = m ? m === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+    document.documentElement.classList.toggle('dark', dark);
+  })();
+</script>
+<script src="https://cdn.tailwindcss.com/3.4.16?plugins=typography"></script>
+<script>
+  tailwind.config = {
+    darkMode: 'class',
+    theme: { extend: {
+      colors: { primary: {50:'#f0f9ff',100:'#e0f2fe',200:'#bae6fd',300:'#7dd3fc',400:'#38bdf8',500:'#0ea5e9',600:'#0284c7',700:'#0369a1',800:'#075985',900:'#0c4a6e',950:'#082f49'} },
+      fontFamily: { sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'], mono: ['JetBrains Mono', 'ui-monospace', 'monospace'] }
+    } }
+  }
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link id="hl-light" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
+<link id="hl-dark" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/go.min.js"></script>
+<style>
+  .prose pre { position: relative; border: 1px solid rgb(228 228 231); background: #f8fafc !important; color: #1f2328 !important; padding: 0 !important; }
+  .dark .prose pre { border-color: rgba(255,255,255,.08); background: #0d1117 !important; color: #e6edf3 !important; }
+  .prose pre code.hljs { background: transparent; padding: 1rem 1.25rem; font-size: .85rem; line-height: 1.6; }
+  .prose :not(pre) > code { background: rgb(240 249 255); color: rgb(3 105 161); padding: .15rem .35rem; border-radius: .35rem; font-weight: 500; }
+  .dark .prose :not(pre) > code { background: rgba(14,165,233,.12); color: rgb(125 211 252); }
+  .prose :not(pre) > code::before, .prose :not(pre) > code::after { content: none; }
+  .prose blockquote { font-style: normal; border-left-color: rgb(14 165 233); background: rgb(240 249 255); padding: .75rem 1rem; border-radius: 0 .5rem .5rem 0; }
+  .dark .prose blockquote { background: rgba(14,165,233,.08); }
+  .prose blockquote p::before, .prose blockquote p::after { content: none; }
+  .prose table { font-size: .875rem; }
+  .prose h2, .prose h3 { scroll-margin-top: 5rem; }
+  .copy-btn { position: absolute; top: .5rem; right: .5rem; opacity: 0; transition: opacity .15s; }
+  .prose pre:hover .copy-btn { opacity: 1; }
+  .toc a.active { color: rgb(2 132 199); font-weight: 600; }
+  .dark .toc a.active { color: rgb(56 189 248); }
+</style>
+</head>
+<body class="min-h-full bg-white font-sans text-zinc-900 antialiased dark:bg-zinc-950 dark:text-zinc-100">
+
+<header class="sticky top-0 z-30 border-b border-zinc-200 bg-white/85 backdrop-blur dark:border-white/10 dark:bg-zinc-950/85">
+  <div class="mx-auto flex h-16 max-w-[90rem] items-center gap-4 px-4 sm:px-6">
+    <button type="button" class="rounded-lg p-2 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-white/5 lg:hidden" onclick="document.getElementById('sidebar').classList.toggle('hidden')" aria-label="Abrir menu">
+      {{icon "bars-3" "h-5 w-5"}}
+    </button>
+    <a href="{{.Base}}" class="flex items-center gap-2">
+      <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary-400 to-primary-700 text-white shadow-sm">{{icon "s-squares-2x2" "h-5 w-5"}}</span>
+      <span class="text-lg font-bold tracking-tight">Loom</span>
+      <span class="rounded-full bg-primary-50 px-2 py-0.5 text-xs font-semibold text-primary-700 ring-1 ring-inset ring-primary-600/20 dark:bg-primary-500/10 dark:text-primary-300">v{{.Version}}</span>
+    </a>
+
+    <div class="relative ml-auto w-full max-w-sm">
+      <span class="pointer-events-none absolute left-3 top-2.5 text-zinc-400">{{icon "magnifying-glass" "h-4 w-4"}}</span>
+      <input id="search" type="search" placeholder="Buscar na documentação..." autocomplete="off"
+             class="w-full rounded-lg border border-zinc-200 bg-zinc-50 py-2 pl-9 pr-12 text-sm outline-none focus:border-primary-500 focus:bg-white focus:ring-2 focus:ring-primary-500/20 dark:border-white/10 dark:bg-white/5 dark:focus:bg-zinc-900">
+      <kbd class="pointer-events-none absolute right-3 top-2 hidden rounded border border-zinc-200 px-1.5 text-xs text-zinc-400 dark:border-white/10 sm:block">/</kbd>
+      <div id="results" class="absolute left-0 right-0 top-12 hidden max-h-96 overflow-y-auto rounded-xl border border-zinc-200 bg-white p-2 shadow-xl dark:border-white/10 dark:bg-zinc-900"></div>
+    </div>
+
+    <button type="button" id="theme" class="rounded-lg p-2 text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-white/5" aria-label="Alternar tema">
+      <span class="dark:hidden">{{icon "moon" "h-5 w-5"}}</span><span class="hidden dark:inline">{{icon "sun" "h-5 w-5"}}</span>
+    </button>
+  </div>
+</header>
+
+<div class="mx-auto flex max-w-[90rem]">
+  <aside id="sidebar" class="fixed inset-x-0 top-16 z-20 hidden h-[calc(100vh-4rem)] overflow-y-auto border-r border-zinc-200 bg-white px-4 py-8 dark:border-white/10 dark:bg-zinc-950 lg:sticky lg:block lg:w-72 lg:shrink-0">
+    <nav class="space-y-8">
+      {{range .Nav}}
+      <div>
+        <h2 class="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">{{.Title}}</h2>
+        <ul class="space-y-0.5">
+          {{range .Pages}}
+          <li><a href="{{$.Base}}/{{.Slug}}" class="block rounded-lg px-3 py-1.5 text-sm {{if eq .Slug $.Page.Slug}}bg-primary-50 font-semibold text-primary-700 dark:bg-primary-500/10 dark:text-primary-300{{else}}text-zinc-700 hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-300 dark:hover:bg-white/5 dark:hover:text-white{{end}}">{{.Title}}</a></li>
+          {{end}}
+        </ul>
+      </div>
+      {{end}}
+    </nav>
+  </aside>
+
+  <main class="min-w-0 flex-1 px-4 py-10 sm:px-8 lg:px-12">
+    <article class="mx-auto max-w-3xl">
+      <p class="text-sm font-semibold text-primary-600 dark:text-primary-400">{{.Page.Section}}</p>
+      <h1 class="mt-2 text-3xl font-extrabold tracking-tight sm:text-4xl">{{.Page.Title}}</h1>
+      {{if .Page.Lead}}<p class="mt-4 text-lg text-zinc-600 dark:text-zinc-400">{{.Page.Lead}}</p>{{end}}
+      <div class="prose prose-zinc mt-8 max-w-none dark:prose-invert prose-headings:scroll-mt-20 prose-headings:font-bold prose-a:text-primary-600 prose-a:no-underline hover:prose-a:underline dark:prose-a:text-primary-400 prose-th:text-left">
+        {{.Page.HTML}}
+      </div>
+
+      <nav class="mt-16 grid gap-4 border-t border-zinc-200 pt-8 dark:border-white/10 sm:grid-cols-2" aria-label="Paginação">
+        {{with .Prev}}
+        <a href="{{$.Base}}/{{.Slug}}" class="group rounded-xl border border-zinc-200 p-4 hover:border-primary-300 dark:border-white/10 dark:hover:border-primary-500/40">
+          <div class="text-xs text-zinc-500">← Anterior</div>
+          <div class="mt-1 font-semibold group-hover:text-primary-600 dark:group-hover:text-primary-400">{{.Title}}</div>
+        </a>
+        {{else}}<span></span>{{end}}
+        {{with .Next}}
+        <a href="{{$.Base}}/{{.Slug}}" class="group rounded-xl border border-zinc-200 p-4 text-right hover:border-primary-300 dark:border-white/10 dark:hover:border-primary-500/40">
+          <div class="text-xs text-zinc-500">Próxima →</div>
+          <div class="mt-1 font-semibold group-hover:text-primary-600 dark:group-hover:text-primary-400">{{.Title}}</div>
+        </a>
+        {{end}}
+      </nav>
+    </article>
+  </main>
+
+  {{if .Page.Headings}}
+  <aside class="sticky top-16 hidden h-[calc(100vh-4rem)] w-64 shrink-0 overflow-y-auto py-10 pr-6 xl:block">
+    <h2 class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Nesta página</h2>
+    <ul class="toc mt-3 space-y-2 border-l border-zinc-200 text-sm dark:border-white/10">
+      {{range .Page.Headings}}
+      <li><a href="#{{.ID}}" data-id="{{.ID}}" class="-ml-px block border-l border-transparent text-zinc-600 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-white {{if eq .Level 3}}pl-7{{else}}pl-4{{end}}">{{.Text}}</a></li>
+      {{end}}
+    </ul>
+  </aside>
+  {{end}}
+</div>
+
+<script>
+  // Theme
+  function syncHighlight() {
+    var dark = document.documentElement.classList.contains('dark');
+    document.getElementById('hl-light').disabled = dark;
+    document.getElementById('hl-dark').disabled = !dark;
+  }
+  syncHighlight();
+  document.getElementById('theme').addEventListener('click', function () {
+    var dark = !document.documentElement.classList.contains('dark');
+    document.documentElement.classList.toggle('dark', dark);
+    try { localStorage.setItem('loom-docs-theme', dark ? 'dark' : 'light'); } catch (e) {}
+    syncHighlight();
+  });
+
+  // Code: highlight + copy button
+  document.querySelectorAll('.prose pre code').forEach(function (el) {
+    hljs.highlightElement(el);
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'copy-btn rounded-md border border-zinc-200 bg-white px-2 py-1 text-xs font-medium text-zinc-600 dark:border-white/10 dark:bg-zinc-800 dark:text-zinc-300';
+    btn.textContent = 'Copiar';
+    btn.addEventListener('click', function () {
+      navigator.clipboard.writeText(el.innerText).then(function () {
+        btn.textContent = 'Copiado!';
+        setTimeout(function () { btn.textContent = 'Copiar'; }, 1500);
+      });
+    });
+    el.parentElement.appendChild(btn);
+  });
+
+  // Table of contents highlight
+  var links = document.querySelectorAll('.toc a');
+  if (links.length) {
+    var observer = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (!e.isIntersecting) return;
+        links.forEach(function (a) { a.classList.toggle('active', a.dataset.id === e.target.id); });
+      });
+    }, { rootMargin: '-80px 0px -70% 0px' });
+    links.forEach(function (a) { var h = document.getElementById(a.dataset.id); if (h) observer.observe(h); });
+  }
+
+  // Search
+  var index = {{.Search}};
+  var input = document.getElementById('search'), results = document.getElementById('results');
+  function norm(s) { return s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase(); }
+  function render(q) {
+    results.replaceChildren();
+    if (!q) { results.classList.add('hidden'); return; }
+    var terms = norm(q).split(/\s+/).filter(Boolean);
+    var hits = index.map(function (e) {
+      var head = norm(e.t + ' ' + e.s), body = norm(e.x || '');
+      var all = terms.every(function (x) { return head.indexOf(x) >= 0 || body.indexOf(x) >= 0; });
+      var inHead = terms.every(function (x) { return head.indexOf(x) >= 0; });
+      return all ? { e: e, score: inHead ? 0 : 1 } : null;
+    }).filter(Boolean).sort(function (a, b) { return a.score - b.score; }).map(function (r) { return r.e; }).slice(0, 12);
+    if (!hits.length) {
+      var empty = document.createElement('p');
+      empty.className = 'px-3 py-6 text-center text-sm text-zinc-500';
+      empty.textContent = 'Nada encontrado para "' + q + '"';
+      results.appendChild(empty);
+    }
+    hits.forEach(function (h) {
+      var a = document.createElement('a');
+      a.href = h.u;
+      a.className = 'block rounded-lg px-3 py-2 hover:bg-zinc-100 dark:hover:bg-white/5';
+      var t = document.createElement('div'); t.className = 'text-sm font-medium'; t.textContent = h.t;
+      var s = document.createElement('div'); s.className = 'text-xs text-zinc-500'; s.textContent = h.s;
+      a.append(t, s);
+      results.appendChild(a);
+    });
+    results.classList.remove('hidden');
+  }
+  input.addEventListener('input', function () { render(input.value.trim()); });
+  input.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { var first = results.querySelector('a'); if (first) location.href = first.href; }
+    if (e.key === 'Escape') { input.value = ''; render(''); input.blur(); }
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === '/' && document.activeElement !== input) { e.preventDefault(); input.focus(); }
+  });
+  document.addEventListener('click', function (e) { if (!results.contains(e.target) && e.target !== input) results.classList.add('hidden'); });
+</script>
+</body>
+</html>

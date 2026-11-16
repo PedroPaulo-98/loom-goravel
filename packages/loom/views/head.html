@@ -1,0 +1,181 @@
+{{define "head"}}
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{.Title}} · {{.Brand}}</title>
+<meta name="color-scheme" content="light dark">
+<script>
+  // Apply theme + sidebar state before the first paint (no flash).
+  (function () {
+    var panel = {{.PanelID}}, fallback = {{.ThemeMode}}, mode, sidebar, font;
+    try {
+      mode = localStorage.getItem('loom-theme-' + panel);
+      sidebar = localStorage.getItem('loom-sidebar-' + panel);
+      font = parseInt(localStorage.getItem('loom-font-' + panel), 10);
+    } catch (e) {}
+    mode = mode || fallback;
+    var root = document.documentElement;
+    root.dataset.themeMode = mode;
+    root.classList.toggle('dark', mode === 'dark' || (mode === 'system' && matchMedia('(prefers-color-scheme: dark)').matches));
+    if (sidebar === 'collapsed') root.dataset.sidebar = 'collapsed';
+
+    // Font size (accessibility): every size in the panel is in rem, so scaling
+    // the root font size scales the whole interface.
+    function syncThemeButtons() {
+      document.querySelectorAll('[data-theme-option]').forEach(function (el) {
+        el.setAttribute('aria-pressed', String(el.dataset.themeOption === root.dataset.themeMode));
+      });
+    }
+    var FONT_SIZES = [85, 100, 115, 130, 150], FONT_DEFAULT = 100;
+    if (FONT_SIZES.indexOf(font) < 0) font = FONT_DEFAULT;
+    function applyFont(size) {
+      font = size;
+      root.style.fontSize = size === FONT_DEFAULT ? '' : size + '%';
+      root.dataset.fontSize = size;
+      syncThemeButtons();
+      document.querySelectorAll('[data-font-label]').forEach(function (el) { el.textContent = size + '%'; });
+      document.querySelectorAll('[data-font-step]').forEach(function (el) {
+        var i = FONT_SIZES.indexOf(size), step = +el.dataset.fontStep;
+        el.disabled = step === 0 ? size === FONT_DEFAULT : !FONT_SIZES[i + step];
+      });
+    }
+    applyFont(font);
+
+    window.loom = {
+      setTheme: function (next) {
+        try { localStorage.setItem('loom-theme-' + panel, next); } catch (e) {}
+        root.dataset.themeMode = next;
+        syncThemeButtons();
+        root.classList.toggle('dark', next === 'dark' || (next === 'system' && matchMedia('(prefers-color-scheme: dark)').matches));
+        window.loom.refreshCharts();
+      },
+      // step: -1 smaller, +1 larger, 0 reset.
+      fontSize: function (step) {
+        var i = FONT_SIZES.indexOf(font);
+        var next = step === 0 ? FONT_DEFAULT : FONT_SIZES[Math.min(Math.max(i + step, 0), FONT_SIZES.length - 1)];
+        applyFont(next);
+        try { localStorage.setItem('loom-font-' + panel, String(next)); } catch (e) {}
+        window.loom.refreshCharts();
+      },
+      syncFont: function () { applyFont(font); },
+      cycleTheme: function () {
+        var order = ['light', 'dark', 'system'];
+        window.loom.setTheme(order[(order.indexOf(root.dataset.themeMode) + 1) % order.length]);
+      },
+      toggleSidebar: function () {
+        var collapsed = root.dataset.sidebar === 'collapsed';
+        if (collapsed) delete root.dataset.sidebar; else root.dataset.sidebar = 'collapsed';
+        try { localStorage.setItem('loom-sidebar-' + panel, collapsed ? 'open' : 'collapsed'); } catch (e) {}
+      },
+      chartDefaults: function () {
+        if (!window.Chart) return;
+        var dark = root.classList.contains('dark');
+        Chart.defaults.color = dark ? '#a1a1aa' : '#71717a';
+        Chart.defaults.borderColor = dark ? 'rgba(255,255,255,.08)' : 'rgba(0,0,0,.06)';
+        Chart.defaults.font.family = 'Inter, ui-sans-serif, system-ui, sans-serif';
+        Chart.defaults.font.size = Math.round(12 * font / 100);
+        Chart.defaults.elements.arc.borderColor = dark ? {{index .ColorsGray "900"}} : '#ffffff';
+      },
+      initCharts: function () {
+        if (!window.Chart) return;
+        window.loom.chartDefaults();
+        document.querySelectorAll('canvas[data-chart]:not([data-ready])').forEach(function (el) {
+          el.dataset.ready = '1';
+          var cfg = JSON.parse(el.dataset.chart);
+          cfg.options = { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: el.dataset.round === '1' || cfg.data.datasets.length > 1, position: 'bottom' } } };
+          if (cfg.type === 'bar' || cfg.type === 'line') cfg.options.scales = { y: { beginAtZero: true } };
+          new Chart(el, cfg);
+        });
+      },
+      refreshCharts: function () {
+        if (!window.Chart) return;
+        window.loom.chartDefaults();
+        Object.values(Chart.instances).forEach(function (c) {
+          if (c.options.scales) Object.values(c.options.scales).forEach(function (s) { s.ticks.color = Chart.defaults.color; s.grid.color = Chart.defaults.borderColor; });
+          if (c.options.plugins && c.options.plugins.legend) c.options.plugins.legend.labels.color = Chart.defaults.color;
+          c.update();
+        });
+      }
+    };
+    matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function () {
+      if (root.dataset.themeMode === 'system') window.loom.setTheme('system');
+    });
+
+    // User menu: open/close with the button, close on outside click or Escape.
+    function menu(open) {
+      var btn = document.getElementById('lm-user-button'), panelEl = document.getElementById('lm-user-menu');
+      if (!btn || !panelEl) return;
+      if (open === undefined) open = panelEl.hidden;
+      panelEl.hidden = !open;
+      btn.setAttribute('aria-expanded', String(open));
+      if (open) {
+        applyFont(font);
+        var first = panelEl.querySelector('button:not([disabled])');
+        if (first) first.focus();
+      }
+    }
+    document.addEventListener('click', function (e) {
+      if (e.target.closest('#lm-user-button')) { menu(); return; }
+      if (!e.target.closest('#lm-user-menu')) menu(false);
+    });
+    document.addEventListener('keydown', function (e) {
+      var panelEl = document.getElementById('lm-user-menu');
+      if (e.key === 'Escape' && panelEl && !panelEl.hidden) {
+        menu(false);
+        document.getElementById('lm-user-button').focus();
+      }
+    });
+    document.addEventListener('DOMContentLoaded', function () { applyFont(font); });
+    document.addEventListener('htmx:afterSettle', function () { applyFont(font); });
+  })();
+</script>
+<script src="https://cdn.tailwindcss.com/3.4.16"></script>
+<script>
+  tailwind.config = {
+    darkMode: 'class',
+    theme: { extend: { colors: {{js .ColorsJSON}}, fontFamily: { sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'] } } }
+  }
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/htmx.org@2.0.4"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', function () { window.loom.initCharts(); });
+  document.addEventListener('htmx:afterSettle', function () { window.loom.initCharts(); });
+</script>
+<style>
+  .htmx-request.htmx-indicator, .htmx-request .htmx-indicator { opacity: 1 }
+  .htmx-indicator { opacity: 0; transition: opacity .2s }
+  #resource-page.htmx-request table { opacity: .6; transition: opacity .2s }
+  @media (min-width: 1024px) {
+    html[data-sidebar=collapsed] .lm-sidebar { width: 4.5rem }
+    html[data-sidebar=collapsed] .lm-label { display: none }
+    html[data-sidebar=collapsed] .lm-nav-link { justify-content: center }
+    html[data-sidebar=collapsed] .lm-group-label { visibility: hidden; height: .5rem }
+  }
+  .lm-theme-icon { display: none }
+  html[data-theme-mode=light] .lm-theme-light, html[data-theme-mode=dark] .lm-theme-dark, html[data-theme-mode=system] .lm-theme-system { display: block }
+</style>
+{{end}}
+
+{{define "theme-toggle"}}
+<button type="button" onclick="loom.cycleTheme()" title="Alternar tema (claro / escuro / sistema)" aria-label="Alternar tema"
+        class="rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-200">
+  <span class="lm-theme-icon lm-theme-light">{{icon "sun" "h-5 w-5"}}</span>
+  <span class="lm-theme-icon lm-theme-dark">{{icon "moon" "h-5 w-5"}}</span>
+  <span class="lm-theme-icon lm-theme-system">{{icon "computer-desktop" "h-5 w-5"}}</span>
+</button>
+{{end}}
+
+{{define "flash"}}
+{{if .FlashSuccess}}
+<div class="mb-6 flex items-center gap-3 rounded-xl border border-success-200 bg-success-50 px-4 py-3 text-sm text-success-800 dark:border-success-500/20 dark:bg-success-500/10 dark:text-success-300" role="status">
+  {{icon "check-circle" "h-5 w-5 shrink-0"}}<span>{{.FlashSuccess}}</span>
+</div>
+{{end}}
+{{if .FlashError}}
+<div class="mb-6 flex items-center gap-3 rounded-xl border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-800 dark:border-danger-500/20 dark:bg-danger-500/10 dark:text-danger-300" role="alert">
+  {{icon "exclamation-circle" "h-5 w-5 shrink-0"}}<span>{{.FlashError}}</span>
+</div>
+{{end}}
+{{end}}

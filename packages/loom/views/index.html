@@ -1,0 +1,141 @@
+{{define "content"}}
+{{$res := .Resource}}
+{{$input := "rounded-lg border border-gray-300 bg-white text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 dark:border-white/10 dark:bg-white/5 dark:text-white"}}
+<div id="resource-page">
+  <div class="flex flex-wrap items-center justify-between gap-4">
+    <div>
+      <h1 class="text-2xl font-bold tracking-tight sm:text-3xl">{{$res.PluralLabel}}</h1>
+      <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{.Total}} registro(s)</p>
+    </div>
+    <a href="{{.BaseURL}}/create" class="inline-flex items-center gap-1.5 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary-500">
+      {{icon "plus" "h-4 w-4"}} Novo {{lower $res.Singular}}
+    </a>
+  </div>
+
+  <div class="mt-6 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-white/10 dark:bg-gray-900">
+    <form id="toolbar" action="{{.BaseURL}}" method="get"
+          class="flex flex-wrap items-center gap-3 border-b border-gray-200 p-4 dark:border-white/10"
+          hx-get="{{.BaseURL}}" hx-target="#resource-page" hx-select="#resource-page" hx-swap="outerHTML" hx-push-url="true"
+          hx-trigger="input changed delay:350ms from:#table-search, change from:.table-filter, submit">
+      <input type="hidden" name="sort" value="{{.State.Sort}}">
+      <input type="hidden" name="dir" value="{{.State.Dir}}">
+      {{if .HasSearch}}
+      <div class="relative w-full sm:w-72">
+        <span class="pointer-events-none absolute left-3 top-2.5 text-gray-400">{{icon "magnifying-glass" "h-4 w-4"}}</span>
+        <input id="table-search" type="search" name="q" value="{{.State.Search}}" placeholder="Buscar..." autocomplete="off"
+               class="block w-full py-2 pl-9 pr-3 {{$input}}">
+      </div>
+      {{end}}
+      {{range .Filters}}
+      {{$current := index $.State.Filters .Name}}
+      <label class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+        <span>{{.LabelText}}</span>
+        <select name="filter_{{.Name}}" class="table-filter py-2 pl-3 pr-8 {{$input}}">
+          <option value="">Todos</option>
+          {{range .Options}}<option value="{{.Value}}" {{if eq .Value $current}}selected{{end}}>{{.Label}}</option>{{end}}
+        </select>
+      </label>
+      {{end}}
+      <div class="ml-auto flex items-center gap-2">
+        <button type="button" class="rounded-lg border border-danger-200 px-3 py-2 text-sm font-medium text-danger-600 hover:bg-danger-50 dark:border-danger-500/30 dark:text-danger-400 dark:hover:bg-danger-500/10"
+                hx-post="{{.BaseURL}}/bulk-delete" hx-include=".row-check:checked" hx-target="this" hx-select="unset"
+                hx-confirm="Excluir os registros selecionados? Esta ação não pode ser desfeita.">
+          Excluir selecionados
+        </button>
+      </div>
+    </form>
+
+    <div class="overflow-x-auto">
+      <table class="min-w-full divide-y divide-gray-200 text-sm dark:divide-white/10">
+        <thead class="bg-gray-50 dark:bg-white/5" hx-target="#resource-page" hx-select="#resource-page" hx-swap="outerHTML">
+          <tr>
+            <th class="w-10 px-4 py-3"><input type="checkbox" aria-label="Selecionar todos" class="rounded border-gray-300 text-primary-600 dark:border-white/20 dark:bg-white/5"
+                onclick="document.querySelectorAll('.row-check').forEach(c => c.checked = this.checked)"></th>
+            {{range .Headers}}
+            <th class="whitespace-nowrap px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-200">
+              {{if .SortURL}}
+              <a href="{{.SortURL}}" class="inline-flex items-center gap-1 hover:text-gray-950 dark:hover:text-white">
+                {{.Column.LabelText}}
+                <span class="{{if .SortedBy}}text-primary-600 dark:text-primary-400{{else}}text-gray-300 dark:text-gray-600{{end}}">{{if eq .SortedBy "desc"}}↓{{else if eq .SortedBy "asc"}}↑{{else}}↕{{end}}</span>
+              </a>
+              {{else}}{{.Column.LabelText}}{{end}}
+            </th>
+            {{end}}
+            <th class="px-4 py-3"><span class="sr-only">Ações</span></th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100 dark:divide-white/5">
+          {{range .Rows}}
+          {{$row := .Row}}{{$id := .ID}}
+          <tr class="hover:bg-gray-50 dark:hover:bg-white/5">
+            <td class="px-4 py-3"><input type="checkbox" name="ids" value="{{.ID}}" aria-label="Selecionar" class="row-check rounded border-gray-300 text-primary-600 dark:border-white/20 dark:bg-white/5"></td>
+            {{range $.Columns}}
+            <td class="whitespace-nowrap px-4 py-3 text-gray-700 dark:text-gray-300">
+              {{if eq .Kind "image"}}
+                {{if hasfile . $row}}<a href="{{$.BaseURL}}/{{$id}}/files/{{.Name}}" target="_blank" rel="noopener" hx-boost="false"><img src="{{$.BaseURL}}/{{$id}}/files/{{.Name}}" alt="{{.LabelText}}" loading="lazy" class="h-10 w-10 rounded-full object-cover ring-1 ring-gray-200 dark:ring-white/10"></a>
+                {{else}}<span class="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-gray-400 dark:bg-white/5">{{icon "photo" "h-5 w-5"}}</span>{{end}}
+              {{else if eq .Kind "file"}}
+                {{if hasfile . $row}}<a href="{{$.BaseURL}}/{{$id}}/files/{{.Name}}" target="_blank" rel="noopener" hx-boost="false" class="inline-flex items-center gap-1 text-primary-600 hover:underline dark:text-primary-400">{{icon "paper-clip" "h-4 w-4"}} Abrir</a>
+                {{else}}<span class="text-gray-400">—</span>{{end}}
+              {{else if eq .Kind "boolean"}}
+                {{if truthy . $row}}<span class="text-success-500" aria-label="Sim">{{icon "check-circle" "h-5 w-5"}}</span>
+                {{else}}<span class="text-danger-400" aria-label="Não">{{icon "x-circle" "h-5 w-5"}}</span>{{end}}
+              {{else if eq .Kind "badge"}}
+                {{$c := color . $row}}
+                <span class="inline-flex rounded-md px-2 py-0.5 text-xs font-medium ring-1 ring-inset
+                  {{if or (eq $c "success") (eq $c "green")}}bg-success-50 text-success-700 ring-success-600/20 dark:bg-success-500/10 dark:text-success-400 dark:ring-success-400/30
+                  {{else if or (eq $c "danger") (eq $c "red")}}bg-danger-50 text-danger-700 ring-danger-600/20 dark:bg-danger-500/10 dark:text-danger-400 dark:ring-danger-400/30
+                  {{else if or (eq $c "warning") (eq $c "yellow")}}bg-warning-50 text-warning-700 ring-warning-600/20 dark:bg-warning-500/10 dark:text-warning-400 dark:ring-warning-400/30
+                  {{else if or (eq $c "info") (eq $c "blue")}}bg-info-50 text-info-700 ring-info-600/20 dark:bg-info-500/10 dark:text-info-400 dark:ring-info-400/30
+                  {{else if or (eq $c "primary") (eq $c "indigo")}}bg-primary-50 text-primary-700 ring-primary-600/20 dark:bg-primary-500/10 dark:text-primary-400 dark:ring-primary-400/30
+                  {{else}}bg-gray-50 text-gray-600 ring-gray-500/20 dark:bg-white/5 dark:text-gray-300 dark:ring-white/10{{end}}">{{display . $row}}</span>
+              {{else}}
+                {{display . $row}}
+              {{end}}
+            </td>
+            {{end}}
+            <td class="whitespace-nowrap px-4 py-3 text-right">
+              <a href="{{$.BaseURL}}/{{.ID}}/edit" class="rounded-md px-2 py-1 text-sm font-medium text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-500/10">Editar</a>
+              <button type="button" class="rounded-md px-2 py-1 text-sm font-medium text-danger-600 hover:bg-danger-50 dark:text-danger-400 dark:hover:bg-danger-500/10"
+                      hx-post="{{$.BaseURL}}/{{.ID}}/delete" hx-confirm="Excluir este registro? Esta ação não pode ser desfeita.">Excluir</button>
+            </td>
+          </tr>
+          {{else}}
+          <tr>
+            <td colspan="{{add (len $.Columns) 2}}" class="px-4 py-16 text-center">
+              <div class="text-sm font-medium">Nenhum registro encontrado</div>
+              <div class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{if or .State.Search .State.Filters}}Tente ajustar a busca ou os filtros.{{else}}Crie o primeiro registro.{{end}}</div>
+            </td>
+          </tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="flex flex-wrap items-center justify-between gap-3 border-t border-gray-200 px-4 py-3 text-sm text-gray-600 dark:border-white/10 dark:text-gray-300"
+         hx-target="#resource-page" hx-select="#resource-page" hx-swap="outerHTML">
+      <div class="flex items-center gap-3">
+        <span>Mostrando {{.From}} a {{.To}} de {{.Total}}</span>
+        <select name="per_page" aria-label="Por página" class="py-1 pl-2 pr-7 {{$input}}"
+                hx-get="{{.BaseURL}}" hx-include="#toolbar" hx-trigger="change" hx-push-url="true">
+          <option value="10" {{if eq .State.PerPage 10}}selected{{end}}>10 / página</option>
+          <option value="25" {{if eq .State.PerPage 25}}selected{{end}}>25 / página</option>
+          <option value="50" {{if eq .State.PerPage 50}}selected{{end}}>50 / página</option>
+          <option value="100" {{if eq .State.PerPage 100}}selected{{end}}>100 / página</option>
+        </select>
+      </div>
+      {{if gt (len .Pages) 1}}
+      <nav class="flex items-center gap-1" aria-label="Paginação">
+        {{if .PrevURL}}<a href="{{.PrevURL}}" class="rounded-md px-2 py-1 hover:bg-gray-100 dark:hover:bg-white/5">‹</a>{{end}}
+        {{range .Pages}}
+          {{if .Gap}}<span class="px-2">…</span>
+          {{else if .Current}}<span class="rounded-md bg-primary-50 px-3 py-1 font-semibold text-primary-700 dark:bg-primary-500/10 dark:text-primary-400" aria-current="page">{{.Number}}</span>
+          {{else}}<a href="{{.URL}}" class="rounded-md px-3 py-1 hover:bg-gray-100 dark:hover:bg-white/5">{{.Number}}</a>{{end}}
+        {{end}}
+        {{if .NextURL}}<a href="{{.NextURL}}" class="rounded-md px-2 py-1 hover:bg-gray-100 dark:hover:bg-white/5">›</a>{{end}}
+      </nav>
+      {{end}}
+    </div>
+  </div>
+</div>
+{{end}}

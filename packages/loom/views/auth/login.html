@@ -1,0 +1,26 @@
+{{define "auth-content"}}
+<form method="post" action="{{.LoginURL}}" class="space-y-5">
+  <input type="hidden" name="_token" value="{{.CSRF}}">
+  {{if .Error}}<div class="rounded-lg bg-danger-50 px-3 py-2 text-sm text-danger-700 dark:bg-danger-500/10 dark:text-danger-300" role="alert">{{.Error}}</div>{{end}}
+  <div>
+    <label for="email" class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-200">E-mail</label>
+    <input id="email" name="email" type="email" required autofocus autocomplete="username" value="{{field .Old "email"}}" class="{{template "auth-input-class"}}">
+  </div>
+  <div>
+    <div class="mb-1.5 flex items-center justify-between">
+      <label for="password" class="text-sm font-medium text-gray-700 dark:text-gray-200">Senha</label>
+      {{if .ForgotURL}}<a href="{{.ForgotURL}}" class="text-sm font-medium text-primary-600 hover:text-primary-500 dark:text-primary-400">Esqueceu a senha?</a>{{end}}
+    </div>
+    <input id="password" name="password" type="password" required autocomplete="current-password" class="{{template "auth-input-class"}}">
+  </div>
+  {{template "auth-button" "Entrar"}}
+</form>
+{{end}}
+
+{{define "auth-footer"}}
+{{if .RegisterURL}}
+<p class="mt-6 text-center text-sm text-gray-500 dark:text-gray-400">
+  Não tem uma conta? <a href="{{.RegisterURL}}" class="font-semibold text-primary-600 hover:text-primary-500 dark:text-primary-400">Criar conta</a>
+</p>
+{{end}}
+{{end}}

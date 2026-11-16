@@ -1,0 +1,14 @@
+.git
+.github
+.idea
+.vscode
+.cursor
+.claude
+.agents
+.env
+.env.*
+!.env.example
+storage
+tmp
+docker-compose.yml
+Dockerfile

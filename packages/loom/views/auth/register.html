@@ -1,0 +1,31 @@
+{{define "auth-content"}}
+<form method="post" action="{{.RegisterURL}}" class="space-y-5" novalidate>
+  <input type="hidden" name="_token" value="{{.CSRF}}">
+  <div>
+    <label for="name" class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-200">Nome</label>
+    <input id="name" name="name" type="text" required autofocus autocomplete="name" value="{{field .Old "name"}}" class="{{template "auth-input-class"}}">
+    {{with field .Errors "name"}}<p class="mt-1.5 text-sm text-danger-600 dark:text-danger-400">{{.}}</p>{{end}}
+  </div>
+  <div>
+    <label for="email" class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-200">E-mail</label>
+    <input id="email" name="email" type="email" required autocomplete="email" value="{{field .Old "email"}}" class="{{template "auth-input-class"}}">
+    {{with field .Errors "email"}}<p class="mt-1.5 text-sm text-danger-600 dark:text-danger-400">{{.}}</p>{{end}}
+  </div>
+  <div>
+    <label for="password" class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-200">Senha</label>
+    <input id="password" name="password" type="password" required autocomplete="new-password" class="{{template "auth-input-class"}}">
+    {{with field .Errors "password"}}<p class="mt-1.5 text-sm text-danger-600 dark:text-danger-400">{{.}}</p>{{end}}
+  </div>
+  <div>
+    <label for="password_confirmation" class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-200">Confirmar senha</label>
+    <input id="password_confirmation" name="password_confirmation" type="password" required autocomplete="new-password" class="{{template "auth-input-class"}}">
+  </div>
+  {{template "auth-button" "Criar conta"}}
+</form>
+{{end}}
+
+{{define "auth-footer"}}
+<p class="mt-6 text-center text-sm text-gray-500 dark:text-gray-400">
+  Já tem uma conta? <a href="{{.LoginURL}}" class="font-semibold text-primary-600 hover:text-primary-500 dark:text-primary-400">Entrar</a>
+</p>
+{{end}}
