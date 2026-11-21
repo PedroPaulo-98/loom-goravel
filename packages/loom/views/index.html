@@ -8,7 +8,7 @@
       <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{.Total}} registro(s)</p>
     </div>
     <a href="{{.BaseURL}}/create" class="inline-flex items-center gap-1.5 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary-500">
-      {{icon "plus" "h-4 w-4"}} Novo {{lower $res.Singular}}
+      {{icon "plus" "h-4 w-4"}} Novo {{lowerWords $res.Singular}}
     </a>
   </div>
 

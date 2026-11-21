@@ -42,7 +42,7 @@ var files embed.FS
 const Version = "0.1"
 
 // sections defines the sidebar order; pages declare their section in the front matter.
-var sections = []string{"Começando", "Painel", "Resources", "Personalização", "Usuários", "Extensões"}
+var sections = []string{"Começando", "Painel", "Resources", "API", "Personalização", "Usuários", "Extensões"}
 
 type heading struct {
 	Level int

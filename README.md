@@ -4,9 +4,9 @@
 
 # Loom
 
-**Painel administrativo para [Goravel](https://www.goravel.dev), inspirado no [Filament](https://filamentphp.com).**
+**Painel administrativo e API REST para [Goravel](https://www.goravel.dev), inspirado no [Filament](https://filamentphp.com).**
 
-Declare formulários e tabelas em Go e o Loom gera as telas de CRUD, a navegação, o login e o dashboard.
+Declare formulários e tabelas em Go e o Loom gera as telas de CRUD, a navegação, o login e o dashboard. Declare campos e regras de acesso e ele gera uma API REST em JSON com autenticação por token.
 
 ![Go](https://img.shields.io/badge/Go-1.25+-00ADD8?logo=go&logoColor=white)
 ![Goravel](https://img.shields.io/badge/Goravel-1.18-5b5bd6)
@@ -34,6 +34,7 @@ Declare formulários e tabelas em Go e o Loom gera as telas de CRUD, a navegaç�
   - [Ganchos das páginas](#ganchos-das-páginas)
   - [Widgets e dashboard](#widgets-e-dashboard)
   - [Páginas próprias](#páginas-próprias)
+  - [API REST](#api-rest)
 - [Comandos](#comandos)
 - [Estrutura do projeto](#estrutura-do-projeto)
 - [Documentação](#documentação)
@@ -43,6 +44,8 @@ Declare formulários e tabelas em Go e o Loom gera as telas de CRUD, a navegaç�
 
 - **CRUD completo**: listagem com busca, filtros, ordenação, paginação e exclusão em massa, além de formulários de criar e editar com validação.
 - **Gerador pelo terminal**: `loom:make-resource Car --generate` lê as colunas da tabela e cria o resource pronto.
+- **API REST**: resources de API com busca, filtros, ordenação, paginação, validação e acesso público ou privado por rota (`--api` no gerador).
+- **Tokens de API** no estilo do Laravel Sanctum: permissões, validade, revogação, tela no painel, login por e-mail e senha e limite de requisições.
 - **Formulários**: Text, Email, Password, Number, Textarea, Select, Toggle, Date e FileUpload, com regras de validação do Goravel e `Unique()` automático.
 - **Upload de arquivos** em três modos: arquivo em disco, base64 numa coluna `text` ou bytes numa coluna `bytea`.
 - **Autenticação**: login, cadastro opcional, recuperação de senha por e-mail (SMTP) e controle de acesso com `CanAccess`.
@@ -344,6 +347,53 @@ func (Reports) Content(ctx loom.Context) (template.HTML, error) {
 
 Registre com `Pages(&Reports{})`. A página ganha o menu, o tema e o login do painel.
 
+### API REST
+
+Gere um resource de API a partir da tabela:
+
+```bash
+go run . artisan loom:make-resource Car --api --generate
+```
+
+```go
+func (Resource) Access() api.Access {
+	return api.Access{
+		Index:   api.Public(),            // GET    /api/v1/cars
+		Show:    api.Public(),            // GET    /api/v1/cars/{id}
+		Store:   api.Can("cars:write"),   // POST   /api/v1/cars
+		Update:  api.Can("cars:write"),   // PUT    /api/v1/cars/{id}
+		Destroy: api.Can("cars:delete"),  // DELETE /api/v1/cars/{id}
+	}
+}
+
+func (Resource) Fields(s *api.Schema) {
+	s.Schema(
+		api.Field("brand").Required().Rules("max:100").Searchable().Sortable(),
+		api.Field("year").Integer().Required().Filterable().Sortable(),
+		api.Field("available").Boolean().Filterable(),
+		api.Field("cost_price").Number().Hidden(),
+		api.Field("created_at").DateTime().ReadOnly().Sortable(),
+	)
+}
+```
+
+- **Acesso**: `api.Public()` dispensa token, `api.Authenticated()` aceita qualquer token e `api.Can("cars:write")` exige a permissão. Rotas não declaradas exigem token.
+- **Listagem**: aceita `?search=gol&filter[year]=2020,2021&sort=-price&page=2&per_page=20` e responde `{"data": [...], "meta": {...}}`.
+- **Erros**: vêm em JSON com status claros: `401`, `403`, `404`, `422` (com os erros de cada campo) e `429`.
+
+Os tokens são enviados em `Authorization: Bearer <token>` e criados de três formas:
+- pela tela **Tokens de API** do painel;
+- pelo comando `loom:make-token`;
+- por `POST /api/v1/auth/token`, com e-mail e senha.
+
+A configuração fica em [`app/providers/api_provider.go`](app/providers/api_provider.go).
+
+Exemplo com curl:
+
+```bash
+curl http://localhost:3000/api/v1/users?per_page=5 -H "Authorization: Bearer SEU_TOKEN"
+```
+
 ## Comandos
 
 | Comando | O que faz |
@@ -351,6 +401,8 @@ Registre com `Pages(&Reports{})`. A página ganha o menu, o tema e o login do pa
 | `go run . artisan loom:make-user` | Cria um usuário administrador. Aceita `--name`, `--email` e `--password`, ou pergunta cada um. |
 | `go run . artisan loom:make-resource Car` | Cria o resource com `resource.go`, `form.go`, `table.go` e `pages.go`, e o registra no painel. |
 | `go run . artisan loom:make-resource Car -g` | O mesmo, montando o formulário e a tabela a partir das colunas do banco. |
+| `go run . artisan loom:make-resource Car --api -g` | Cria um resource de API REST e o registra no `APIProvider`. |
+| `go run . artisan loom:make-token --email=... --abilities="cars:*"` | Cria um token de API. Também aceita `--name` e `--days`. |
 
 O `loom:make-resource` também aceita `--table`, `--slug`, `--label`, `--singular`, `--icon`, `--group`, `--no-register` e `--force`.
 
@@ -360,9 +412,11 @@ O `loom:make-resource` também aceita `--table`, `--slug`, `--label`, `--singula
 .
 ├── app/
 │   ├── loom/admin/           resources e widgets do painel /admin
-│   └── providers/            AdminPanelProvider
-├── database/migrations/      users, password_reset_tokens, colunas de upload
+│   ├── loom/api/             resources da API /api/v1
+│   └── providers/            AdminPanelProvider e APIProvider
+├── database/migrations/      users, password_reset_tokens, api_tokens, colunas de upload
 ├── packages/loom/            o Loom
+│   ├── api/                  campos e regras de acesso da API
 │   ├── color/                paletas de cores
 │   ├── docs/                 site de documentação (/loom/docs)
 │   ├── form/                 campos de formulário e upload
@@ -375,7 +429,7 @@ O `loom:make-resource` também aceita `--table`, `--slug`, `--label`, `--singula
 
 ## Documentação
 
-Com o app rodando, a documentação completa fica em **`/loom/docs`**: instalação, configuração do painel, resources, gerador, tabelas, formulários, upload, cores e tema, ícones, autenticação, recuperação de senha, widgets, páginas, plugins e middleware.
+Com o app rodando, a documentação completa fica em **`/loom/docs`**: instalação, configuração do painel, resources, gerador, tabelas, formulários, upload, cores e tema, ícones, autenticação, recuperação de senha, widgets, páginas, plugins e middleware, além de resources de API e autenticação da API.
 
 As páginas são arquivos Markdown em [`packages/loom/docs/content`](packages/loom/docs/content).
 

@@ -39,6 +39,7 @@ func (r *AdminPanelProvider) Panel(panel *loom.Panel) *loom.Panel {
 		}).
 		Resources(
 			&user.Resource{},
+			&loom.APITokenResource{Group: "Sistema"},
 		).
 		Widgets(
 			widgets.UsersOverview(),
@@ -66,9 +67,11 @@ func (r *AdminPanelProvider) Boot(app foundation.Application) {
 	app.Commands([]console.Command{
 		loom.NewMakeUserCommand(r.Services, map[string]any{"role": "admin", "is_active": true}),
 		loom.NewMakeResourceCommand(loom.MakeResourceConfig{
-			Dir:      "app/loom/admin",
-			Provider: "app/providers/admin_panel_provider.go",
-			Schema:   facades.Schema,
+			Dir:         "app/loom/admin",
+			Provider:    "app/providers/admin_panel_provider.go",
+			Schema:      facades.Schema,
+			APIDir:      "app/loom/api",
+			APIProvider: "app/providers/api_provider.go",
 		}),
 	})
 

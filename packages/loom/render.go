@@ -24,15 +24,16 @@ type renderer struct {
 }
 
 var funcs = template.FuncMap{
-	"lower":   strings.ToLower,
-	"display": func(c *table.Column, row table.Row) string { return c.Display(row) },
-	"truthy":  func(c *table.Column, row table.Row) bool { return c.Truthy(row) },
-	"color":   func(c *table.Column, row table.Row) string { return c.Color(row) },
-	"field":   func(m map[string]string, k string) string { return m[k] },
-	"add":     func(a, b int) int { return a + b },
-	"icon":    heroicons.SVG,
-	"hasfile": func(c *table.Column, row table.Row) bool { return hasFileValue(row[c.Name()]) },
-	"js":      func(s string) template.JS { return template.JS(s) },
+	"lower":      strings.ToLower,
+	"lowerWords": lowerWords,
+	"display":    func(c *table.Column, row table.Row) string { return c.Display(row) },
+	"truthy":     func(c *table.Column, row table.Row) bool { return c.Truthy(row) },
+	"color":      func(c *table.Column, row table.Row) string { return c.Color(row) },
+	"field":      func(m map[string]string, k string) string { return m[k] },
+	"add":        func(a, b int) int { return a + b },
+	"icon":       heroicons.SVG,
+	"hasfile":    func(c *table.Column, row table.Row) bool { return hasFileValue(row[c.Name()]) },
+	"js":         func(s string) template.JS { return template.JS(s) },
 	"themeOptions": func() []struct{ Mode, Icon, Label string } {
 		return []struct{ Mode, Icon, Label string }{
 			{"light", "sun", "Claro"},
@@ -237,4 +238,15 @@ func (p *Panel) notFound(ctx contractshttp.Context) contractshttp.Response {
 		"Code":    404,
 		"Message": "O registro que você procura não existe.",
 	})
+}
+
+// lowerWords lowercases each word but keeps acronyms: "Token de API" => "token de API".
+func lowerWords(s string) string {
+	words := strings.Fields(s)
+	for i, w := range words {
+		if w != strings.ToUpper(w) || len([]rune(w)) == 1 {
+			words[i] = strings.ToLower(w)
+		}
+	}
+	return strings.Join(words, " ")
 }

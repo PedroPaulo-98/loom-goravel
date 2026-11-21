@@ -58,5 +58,6 @@ func Providers() []foundation.ServiceProvider {
 		&testing.ServiceProvider{},
 		// Panels must come after route, database, mail and hash.
 		&providers.AdminPanelProvider{},
+		&providers.APIProvider{},
 	}
 }

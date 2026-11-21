@@ -12,5 +12,6 @@ func Migrations() []schema.Migration {
 		&migrations.M20261112014421CreateUsersTable{},
 		&migrations.M20261112021827CreatePasswordResetTokensTable{},
 		&migrations.M20261112120651AddFilesToUsersTable{},
+		&migrations.M20261116120000CreateApiTokensTable{},
 	}
 }

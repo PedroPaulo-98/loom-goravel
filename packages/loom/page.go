@@ -8,20 +8,40 @@ import (
 	contractshttp "github.com/goravel/framework/contracts/http"
 )
 
-// Context is passed to pages and widgets while rendering.
+// Context is passed to pages, widgets and resource hooks.
+// Panel is set inside the admin panel and API inside API resources.
 type Context struct {
 	HTTP  contractshttp.Context
 	Panel *Panel
+	API   *API
 }
 
-// DB returns the panel database bound to the request context.
-func (c Context) DB() contractsdb.DB { return c.Panel.svc.DB.WithContext(c.HTTP) }
+// DB returns the database bound to the request context.
+func (c Context) DB() contractsdb.DB { return c.Services().DB.WithContext(c.HTTP) }
 
-// Services returns every service the panel was registered with.
-func (c Context) Services() Services { return c.Panel.svc }
+// Services returns the services the panel or API was registered with.
+func (c Context) Services() Services {
+	switch {
+	case c.Panel != nil:
+		return c.Panel.svc
+	case c.API != nil:
+		return c.API.svc
+	}
+	return Services{}
+}
 
-// User returns the logged-in user row.
+// User returns the logged-in user row (nil on public API calls without a token).
 func (c Context) User() map[string]any { return currentUser(c.HTTP) }
+
+// Token returns the API token of the request (nil in the panel or without a token).
+func (c Context) Token() *Token { return currentToken(c.HTTP) }
+
+// Notify replaces the panel's success message after a create or save, e.g. to
+// show a value only once.
+func (c Context) Notify(message string) {
+	flash(c.HTTP, "success", message)
+	c.HTTP.WithValue(ctxNotifiedKey, true)
+}
 
 // Page is a custom screen inside the panel (like a Filament Page).
 //

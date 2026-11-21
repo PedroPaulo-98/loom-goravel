@@ -488,7 +488,9 @@ func (h *crudHandler) save(ctx contractshttp.Context, id string) contractshttp.R
 				return p.serverError(ctx, err)
 			}
 		}
-		flash(ctx, "success", res.Singular()+" atualizado com sucesso.")
+		if ctx.Value(ctxNotifiedKey) == nil {
+			flash(ctx, "success", res.Singular()+" atualizado com sucesso.")
+		}
 	} else {
 		if res.Timestamps() {
 			data["created_at"] = now
@@ -503,7 +505,9 @@ func (h *crudHandler) save(ctx contractshttp.Context, id string) contractshttp.R
 				return p.serverError(ctx, err)
 			}
 		}
-		flash(ctx, "success", res.Singular()+" criado com sucesso.")
+		if ctx.Value(ctxNotifiedKey) == nil {
+			flash(ctx, "success", res.Singular()+" criado com sucesso.")
+		}
 	}
 	return redirect(ctx, p.URL(res.Slug()))
 }
@@ -516,10 +520,10 @@ func (h *crudHandler) renderForm(ctx contractshttp.Context, id string, values, e
 func (h *crudHandler) renderFormWith(ctx contractshttp.Context, id string, values, errs map[string]string, status int, formError string) contractshttp.Response {
 	res := h.res
 	isEdit := id != ""
-	title := "Novo " + strings.ToLower(res.Singular())
+	title := "Novo " + lowerWords(res.Singular())
 	action := h.panel.URL(res.Slug())
 	if isEdit {
-		title = "Editar " + strings.ToLower(res.Singular())
+		title = "Editar " + lowerWords(res.Singular())
 		action = h.panel.URL(res.Slug(), id)
 	}
 	if errs == nil {

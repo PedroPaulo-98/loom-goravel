@@ -34,6 +34,10 @@ type MakeResourceConfig struct {
 	Provider string
 	// Schema reads the table columns for --generate (usually facades.Schema).
 	Schema func() schema.Schema
+	// APIDir is where --api resources are created (default "app/loom/api").
+	APIDir string
+	// APIProvider is the API provider file where --api resources are registered.
+	APIProvider string
 }
 
 // MakeResourceCommand scaffolds a resource folder (like `php artisan make:filament-resource`):
@@ -50,12 +54,15 @@ func NewMakeResourceCommand(cfg MakeResourceConfig) *MakeResourceCommand {
 	if cfg.Dir == "" {
 		cfg.Dir = "app/loom/admin"
 	}
+	if cfg.APIDir == "" {
+		cfg.APIDir = "app/loom/api"
+	}
 	return &MakeResourceCommand{cfg: cfg}
 }
 
 func (c *MakeResourceCommand) Signature() string { return "loom:make-resource" }
 func (c *MakeResourceCommand) Description() string {
-	return "Create a Loom resource (resource, form, table and page hooks)"
+	return "Create a Loom resource (panel, or JSON API with --api)"
 }
 
 func (c *MakeResourceCommand) Extend() command.Extend {
@@ -64,6 +71,7 @@ func (c *MakeResourceCommand) Extend() command.Extend {
 		ArgsUsage: " <name>",
 		Flags: []command.Flag{
 			&command.BoolFlag{Name: "generate", Aliases: []string{"g"}, Usage: "Generate form fields and table columns from the database table"},
+			&command.BoolFlag{Name: "api", Usage: "Create a JSON API resource instead of a panel resource"},
 			&command.StringFlag{Name: "table", Usage: "Database table (default: snake_case plural of the name)"},
 			&command.StringFlag{Name: "slug", Usage: "URL slug (default: the table name with dashes)"},
 			&command.StringFlag{Name: "label", Usage: "Plural label shown in the menu, e.g. Carros"},
@@ -99,6 +107,7 @@ type resourceSpec struct {
 	SortDir    string
 	HasForm    bool
 	HasTable   bool
+	APIFields  []string
 }
 
 func (c *MakeResourceCommand) Handle(ctx console.Context) error {
@@ -134,11 +143,17 @@ func (c *MakeResourceCommand) Handle(ctx console.Context) error {
 	}
 	plural := append(append([]string{}, words[:len(words)-1]...), pluralize(words[len(words)-1]))
 
+	isAPI := ctx.OptionBool("api")
+	baseDir, provider := c.cfg.Dir, c.cfg.Provider
+	if isAPI {
+		baseDir, provider = c.cfg.APIDir, c.cfg.APIProvider
+	}
+
 	loomPath := reflect.TypeOf(Panel{}).PkgPath()
 	spec := resourceSpec{
 		Loom:     loomPath,
 		Package:  pkg,
-		Import:   module + "/" + filepath.ToSlash(filepath.Join(c.cfg.Dir, pkg)),
+		Import:   module + "/" + filepath.ToSlash(filepath.Join(baseDir, pkg)),
 		Table:    strings.Join(plural, "_"),
 		Label:    titleWords(plural),
 		Singular: titleWords(words),
@@ -170,23 +185,36 @@ func (c *MakeResourceCommand) Handle(ctx console.Context) error {
 			ctx.Error("--generate needs MakeResourceConfig.Schema (e.g. facades.Schema).")
 			return nil
 		}
-		if err := spec.generate(c.cfg.Schema()); err != nil {
+		gen := spec.generate
+		if isAPI {
+			gen = spec.generateAPI
+		}
+		if err := gen(c.cfg.Schema()); err != nil {
 			ctx.Error(err.Error())
 			return nil
 		}
-	} else {
+	} else if !isAPI {
 		spec.Columns = []string{`table.Text("id").Label("ID").Sortable(),`}
 		spec.SortColumn, spec.SortDir = "id", "desc"
 	}
 	spec.HasForm = len(spec.Fields) > 0
 	spec.HasTable = len(spec.Columns) > 0
 
-	dir := filepath.Join(c.cfg.Dir, pkg)
+	dir := filepath.Join(baseDir, pkg)
+	order := []string{"resource.go", "form.go", "table.go", "pages.go"}
 	files := map[string]*template.Template{
 		"resource.go": resourceTpl,
 		"form.go":     formTpl,
 		"table.go":    tableTpl,
 		"pages.go":    pagesTpl,
+	}
+	if isAPI {
+		order = []string{"resource.go", "fields.go", "hooks.go"}
+		files = map[string]*template.Template{
+			"resource.go": apiResourceTpl,
+			"fields.go":   apiFieldsTpl,
+			"hooks.go":    apiHooksTpl,
+		}
 	}
 	if !ctx.OptionBool("force") {
 		for f := range files {
@@ -199,7 +227,7 @@ func (c *MakeResourceCommand) Handle(ctx console.Context) error {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
-	for _, f := range []string{"resource.go", "form.go", "table.go", "pages.go"} {
+	for _, f := range order {
 		var buf bytes.Buffer
 		if err := files[f].Execute(&buf, spec); err != nil {
 			return err
@@ -214,17 +242,21 @@ func (c *MakeResourceCommand) Handle(ctx console.Context) error {
 		ctx.Info("Created " + filepath.Join(dir, f))
 	}
 
-	if c.cfg.Provider != "" && !ctx.OptionBool("no-register") {
-		added, err := registerResource(c.cfg.Provider, pkg, spec.Import)
+	if provider != "" && !ctx.OptionBool("no-register") {
+		added, err := registerResource(provider, pkg, spec.Import)
 		switch {
 		case err != nil:
-			ctx.Warning("Could not register it automatically (" + err.Error() + "). Add &" + pkg + ".Resource{} to Resources(...) in " + c.cfg.Provider)
+			ctx.Warning("Could not register it automatically (" + err.Error() + "). Add &" + pkg + ".Resource{} to Resources(...) in " + provider)
 		case added:
-			ctx.Info("Registered in " + c.cfg.Provider)
+			ctx.Info("Registered in " + provider)
 		}
 	}
 
-	ctx.Success(fmt.Sprintf("Resource %s created: /%s. Restart the app to see it.", spec.Label, spec.Slug))
+	if isAPI {
+		ctx.Success(fmt.Sprintf("API resource created: /%s (abilities %s:read, %s:write, %s:delete). Restart the app.", spec.Slug, spec.Slug, spec.Slug, spec.Slug))
+	} else {
+		ctx.Success(fmt.Sprintf("Resource %s created: /%s. Restart the app to see it.", spec.Label, spec.Slug))
+	}
 	if !ctx.OptionBool("generate") {
 		ctx.Line("Tip: use --generate to build the form and table from the " + spec.Table + " columns.")
 	}
@@ -704,6 +736,212 @@ var pagesTpl = template.Must(template.New("pages").Parse(`package {{.Package}}
 // }
 
 // BeforeDelete runs before a single or bulk delete; loom.Halt cancels it.
+//
+// func (Resource) BeforeDelete(ctx loom.Context, ids []any) error {
+// 	return nil
+// }
+`))
+
+// generateAPI builds the API fields from the table columns.
+func (s *resourceSpec) generateAPI(sch schema.Schema) error {
+	if !sch.HasTable(s.Table) {
+		return fmt.Errorf("table %q not found: run the migration first or pass --table", s.Table)
+	}
+	cols, err := sch.GetColumns(s.Table)
+	if err != nil {
+		return err
+	}
+	indexes, _ := sch.GetIndexes(s.Table)
+	pk := "id"
+	unique := map[string]bool{}
+	for _, ix := range indexes {
+		if ix.Primary && len(ix.Columns) == 1 {
+			pk = ix.Columns[0]
+		} else if ix.Unique && len(ix.Columns) == 1 {
+			unique[ix.Columns[0]] = true
+		}
+	}
+	if pk != "id" {
+		s.PrimaryKey = pk
+	}
+	s.Generated = true
+	has := map[string]bool{}
+	for _, c := range cols {
+		has[c.Name] = true
+	}
+	s.NoStamps = !has["created_at"] || !has["updated_at"]
+
+	for _, c := range cols {
+		name := c.Name
+		if name == pk || name == "deleted_at" || name == "remember_token" {
+			continue
+		}
+		kind := classify(c)
+		if kind == kindBinary {
+			s.APIFields = append(s.APIFields, fmt.Sprintf("// %q (%s) is not exposed: binary columns are not supported by the API.", name, c.TypeName))
+			continue
+		}
+		f := fmt.Sprintf("api.Field(%q)", name)
+		switch kind {
+		case kindBool:
+			f += ".Boolean()"
+		case kindInt:
+			f += ".Integer()"
+		case kindDecimal:
+			f += ".Number()"
+		case kindDate:
+			f += ".Date()"
+		case kindDateTime:
+			f += ".DateTime()"
+		}
+		if strings.Contains(name, "password") {
+			f = fmt.Sprintf("api.Field(%q).Password()", name)
+		}
+		if name == "created_at" || name == "updated_at" {
+			s.APIFields = append(s.APIFields, f+".ReadOnly().Sortable(),")
+			continue
+		}
+		if !c.Nullable && c.Default == "" && !c.Autoincrement && kind != kindBool {
+			f += ".Required()"
+		} else if c.Nullable {
+			f += ".Nullable()"
+		}
+		if unique[name] {
+			f += ".Unique()"
+		}
+		var rules []string
+		if strings.Contains(name, "email") && kind == kindString {
+			rules = append(rules, `"email"`)
+		}
+		if strings.Contains(name, "password") {
+			rules = append(rules, `"min:8"`)
+		}
+		if kind == kindString {
+			if m := lengthRe.FindStringSubmatch(c.Type); m != nil {
+				rules = append(rules, fmt.Sprintf(`"max:%s"`, m[1]))
+			}
+		}
+		if len(rules) > 0 {
+			f += ".Rules(" + strings.Join(rules, ", ") + ")"
+		}
+		switch {
+		case strings.Contains(name, "password"):
+		case kind == kindString && !strings.HasSuffix(name, "_id"):
+			f += ".Searchable().Sortable()"
+		case kind == kindBool || strings.HasSuffix(name, "_id"):
+			f += ".Filterable()"
+		case kind == kindInt || kind == kindDecimal || kind == kindDate || kind == kindDateTime:
+			f += ".Sortable()"
+		}
+		s.APIFields = append(s.APIFields, f+",")
+	}
+	return nil
+}
+
+var apiResourceTpl = template.Must(template.New("apiresource").Parse(`// Package {{.Package}} is the API resource for the {{.Table}} table.
+//
+//	resource.go  identity and access rules
+//	fields.go    fields accepted and returned
+//	hooks.go     create/update/delete hooks
+package {{.Package}}
+
+import (
+	"{{.Loom}}"
+	"{{.Loom}}/api"
+)
+
+// Resource exposes the {{.Table}} table as JSON.
+type Resource struct {
+	loom.BaseAPIResource
+}
+
+func (Resource) Slug() string      { return {{printf "%q" .Slug}} }
+func (Resource) TableName() string { return {{printf "%q" .Table}} }
+
+// Access defines who can call each endpoint:
+// api.Public() (no token), api.Authenticated() (any token) or api.Can("ability").
+func (Resource) Access() api.Access {
+	return api.Access{
+		Index:   api.Authenticated(),
+		Show:    api.Authenticated(),
+		Store:   api.Can("{{.Slug}}:write"),
+		Update:  api.Can("{{.Slug}}:write"),
+		Destroy: api.Can("{{.Slug}}:delete"),
+	}
+}
+{{- if .PrimaryKey}}
+
+func (Resource) PrimaryKey() string { return {{printf "%q" .PrimaryKey}} }
+{{- end}}
+{{- if .NoStamps}}
+
+// The table has no created_at/updated_at pair, so they are not filled automatically.
+func (Resource) Timestamps() bool { return false }
+{{- end}}
+`))
+
+var apiFieldsTpl = template.Must(template.New("apifields").Parse(`package {{.Package}}
+
+import "{{.Loom}}/api"
+
+// Fields lists the columns the API accepts and returns.
+// Types: Integer, Number, Boolean, Date, DateTime, Password (string by default).
+// Modifiers: Required, Nullable, Unique, Rules, Hidden, ReadOnly, Searchable, Sortable, Filterable.
+func (Resource) Fields(s *api.Schema) {
+	s.Schema(
+{{- range .APIFields}}
+		{{.}}
+{{- end}}
+{{- if not .Generated}}
+		// api.Field("name").Required().Rules("max:255").Searchable().Sortable(),
+		// api.Field("price").Number().Required().Sortable(),
+		// api.Field("is_active").Boolean().Filterable(),
+		// api.Field("created_at").DateTime().ReadOnly().Sortable(),
+{{- end}}
+	)
+}
+`))
+
+var apiHooksTpl = template.Must(template.New("apihooks").Parse(`package {{.Package}}
+
+// Hooks of the API endpoints. Every method is optional: uncomment what you
+// need and add the imports:
+//
+//	contractsdb "github.com/goravel/framework/contracts/database/db"
+//	"{{.Loom}}"
+
+// ModifyQuery scopes every endpoint (list, show, update, delete).
+//
+// func (Resource) ModifyQuery(ctx loom.Context, q contractsdb.Query) contractsdb.Query {
+// 	return q.Where("user_id", ctx.User()["id"])
+// }
+
+// BeforeCreate runs after validation, before the INSERT. Return loom.Halt("...") for a 422.
+//
+// func (Resource) BeforeCreate(ctx loom.Context, data map[string]any) error {
+// 	data["user_id"] = ctx.User()["id"]
+// 	return nil
+// }
+
+// AfterCreate runs after the INSERT.
+//
+// func (Resource) AfterCreate(ctx loom.Context, data map[string]any) error {
+// 	return nil
+// }
+
+// BeforeSave runs before the UPDATE (PUT and PATCH).
+//
+// func (Resource) BeforeSave(ctx loom.Context, id string, data map[string]any) error {
+// 	return nil
+// }
+
+// AfterSave runs after the UPDATE.
+//
+// func (Resource) AfterSave(ctx loom.Context, id string, data map[string]any) error {
+// 	return nil
+// }
+
+// BeforeDelete runs before the DELETE.
 //
 // func (Resource) BeforeDelete(ctx loom.Context, ids []any) error {
 // 	return nil
